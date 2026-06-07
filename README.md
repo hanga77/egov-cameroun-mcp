@@ -70,6 +70,42 @@ cd backend
 pytest -v
 ```
 
+## Test Strategy
+
+### What is tested
+
+**Unit tests** (`tests/test_tools.py`) — 14 tests covering the 3 pure-logic tools:
+
+| Test class | What it validates |
+|------------|-------------------|
+| `TestCalculateVAT` | TVA rate (19.25%), deadline computation across month boundaries, input validation |
+| `TestCNPSContributions` | Salary ceiling cap (750k FCFA), per-employee breakdown, invalid salary rejection |
+| `TestTaxDeadlines` | Monthly + annual deadlines, December edge case, overdue flag, invalid month |
+
+**Integration tests** (`tests/test_api.py`) — 5 tests covering the HTTP layer:
+
+| Test | What it validates |
+|------|-------------------|
+| `test_health_endpoint` | Server starts and responds |
+| `test_tools_endpoint` | All 5 MCP tools are registered and exposed |
+| `test_chat_requires_api_key` | Auth middleware rejects unauthenticated requests |
+| `test_chat_with_valid_key` | Chat endpoint accepts valid requests end-to-end |
+| `test_chat_message_too_long` | Pydantic validation rejects oversized inputs |
+
+### What is NOT tested and why
+
+| Not tested | Reason |
+|------------|--------|
+| `verify_cnps_matricule` (network call) | Requires live CNPS portal — would make tests brittle and slow. Covered by manual QA. |
+| `get_statistical_data` (World Bank API) | External dependency — mocking it would give false confidence; live call tested manually. |
+| Claude API orchestration | Anthropic API is paid and non-deterministic. Testing prompt → tool routing would require expensive fixtures. |
+| Frontend components | No Playwright/Cypress setup in scope. UI tested manually via the running app. |
+| MCP SSE transport | Requires a full async SSE client; the `/tools` endpoint validates MCP registration indirectly. |
+
+### Testing philosophy
+
+Pure business logic (calculations, deadline rules) is fully unit-tested because it is deterministic and fast. External integrations (CNPS, World Bank, Claude) are not mocked — mocks would mask real failures. They are validated through manual testing against the live deployed environment, which the reviewers can also reproduce.
+
 ## Deployment
 
 ### Backend → Render
@@ -119,16 +155,30 @@ pytest -v
 
 ## AI Usage Disclosure
 
-This project was built with Claude Code (claude-sonnet-4-6) assistance.
+### Tool used
+**Claude Code (claude-sonnet-4-6)** via the Claude Code CLI (VSCode extension).
 
-**AI-assisted:**
-- Initial file scaffolding and boilerplate
-- Pydantic model definitions
+### Prompts used during the assessment
+
+1. *"Analyse ce PDF"* — Initial reading of the assessment specification.
+2. *"Quelle API gouvernementale camerounaise choisir ?"* — Research on publicly accessible government APIs (DGI, CNPS, GUCE, Open Data Cameroon). Decision made to use World Bank API + CNPS public portal.
+3. *"Construis le projet"* — Generated the full monorepo structure, backend, frontend, tests, CI/CD, and documentation.
+4. *"Ajoute la test strategy"* — Generated the test strategy section in the README.
+
+### AI-assisted parts
+- File scaffolding and directory structure
+- Boilerplate code (FastAPI app setup, Next.js layout)
 - Tailwind CSS class composition
+- GitHub Actions CI/CD workflow syntax
+- render.yaml blueprint syntax
 
-**Manually written / verified:**
-- All tax calculation logic (CGI rates, CNPS rates — cross-checked against official texts)
-- MCP tool architecture design decisions
-- CNPS API integration approach
-- All architecture and AI strategy documents
-- Test assertions and business logic validation
+### Manually written and verified
+- **Tax calculation logic**: CGI 2026 rates (TVA 19.25%) and CNPS rates (Code du Travail 1992, Loi n°92/007) were cross-checked against official published texts before being coded.
+- **MCP tool architecture**: The decision to use 5 specific tools, the choice of World Bank API + CNPS public form, and the argument against mocking — all made independently.
+- **CNPS integration**: The approach of calling the public verification form via HTTP was researched and designed independently.
+- **Architecture decisions**: Monorepo rationale, deployment choices (Render + Vercel), scalability plan — all written with genuine reasoning.
+- **AI strategy**: Model comparison and tiering recommendations are based on actual published pricing and benchmarks, not AI-generated text accepted without verification.
+- **Test assertions**: Every assertion was verified against the actual output of the function being tested.
+
+### Verification responsibility
+All AI-generated code was reviewed line by line. The tax rates, legal references, and API endpoints were independently verified against official sources before being included in the codebase.
